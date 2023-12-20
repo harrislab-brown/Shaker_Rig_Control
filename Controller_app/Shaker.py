@@ -65,6 +65,7 @@ class Shaker:
         self.output_path = '../data/' 
         self.output_file = None
         self.stream_raw_output = True
+        self.run_freq_sweep = False
         
         
 
@@ -149,9 +150,9 @@ class Shaker:
             plot_arr = np.transpose(np.asarray([x_out,y_out,z_out,data[:,3],data[:,4]]))
             self.plot.add_data_frame(plot_arr)
             
-            self.x_accel,x_accel_std = self.x_filter.find_average_accel()
-            self.y_accel,y_accel_std = self.y_filter.find_average_accel()
-            self.z_accel,z_accel_std = self.z_filter.find_average_accel()
+            self.x_accel,self.x_accel_std = self.x_filter.find_average_accel()
+            self.y_accel,self.y_accel_std = self.y_filter.find_average_accel()
+            self.z_accel,self.z_accel_std = self.z_filter.find_average_accel()
             self.plot.add_point('ax', self.total_time, self.x_accel)
             self.plot.add_point('ay', self.total_time, self.y_accel)
             self.plot.add_point('az', self.total_time, self.z_accel)
@@ -171,6 +172,9 @@ class Shaker:
                 else:
                     for line in data:
                         self.output_file.write(','.join(map(str, line))+'\n')
+
+            if(self.run_freq_sweep):
+                pass
                 
 
 
@@ -243,12 +247,15 @@ class Shaker:
         # set up filtering of incoming data
         freq = self.tone.get_frequency()
         sample_rate = 10000
-        self.x_filter = Filter(freq, sample_rate, self.buff_len, 3, 90)
+        self.x_filter = Filter(freq, sample_rate, self.buff_len, 3, 0)
         self.y_filter = Filter(freq, sample_rate, self.buff_len, 3, 0)
         self.z_filter = Filter(freq, sample_rate, self.buff_len, 3, 0)
         self.x_accel = 0.0
         self.y_accel = 0.0
         self.z_accel = 0.0
+        self.x_accel_std = 0.0
+        self.y_accel_std = 0.0
+        self.z_accel_std = 0.0
 
     def init_control_loop(self):
         self.target_accel = 0
@@ -260,7 +267,6 @@ class Shaker:
         self.k_p = 0.016#0.013
         self.k_i = 1.95#1.8
         self.k_d = 0.00005
-
 
     def exit(self):
         # end of program code
@@ -320,9 +326,40 @@ class Shaker:
             sleep(trans_time)
             self.set_accel_amplitude(accel)
             sleep(hold_time)
-        
+
+    def start_freq_sweep(self, start_freq, stop_freq, num_steps, settle_time capture_time):
+        """
+        Behavior: 
+            - start and stop frequency
+            - frequency increment (step)
+            - settle condition (maybe time?)
+                - error percentage below some threshold for some time
+            - how long to record for 
+                - 1 sec per frequency?
+            - how to save the recording
+                - no raw data
+                - ratio of z to |xy| per frequency
+                - THD possibly?
+                - volume of output (proxy for power)
+            - generate and save a bode plot
+            - visual indication (in GUI) that it is stepping frequency and saving data (process indicator?)
+            - way to know when it's done / if it was successful
+            
+        """
+        freq_list = np.linspace(start_freq,stop_freq,num_steps)
+        print(freq_list)
+        self.pause_tone()
+        self.sweep_thread = threading.Thread(target = self.freq_sweep_thread, args=[freq_list,settle_time, capture_time])
+
+
+    def freq_sweep_thread(self, freq_list, settle_time, capture_time):
+        pass
 
         
+    
+
+
+            
     def pause_tone(self,tone=None):
         # Pause current tone. Cannot pause a tone sequence 
         if self.tone_sequence_running:
